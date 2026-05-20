@@ -19,3 +19,6 @@ build/
 *memory-count-*.jsonl
 *candidates.json
 guided-memory-*.jsonl
+
+# pywebview local browser storage/cache
+.webview_forza/
