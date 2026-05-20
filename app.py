@@ -27,6 +27,25 @@ _CV2_CACHE = None
 _CV2_ERROR = None
 
 
+THEME = {
+    "bg": "#0b0f12",
+    "bg2": "#10161a",
+    "panel": "#121922",
+    "panel2": "#151c25",
+    "field": "#0f151d",
+    "line": "#273446",
+    "line2": "#30455f",
+    "text": "#f4efe7",
+    "muted": "#a4acb5",
+    "accent": "#d6b785",
+    "accent2": "#f0d2a0",
+    "button": "#1c2a3d",
+    "button_hover": "#24354c",
+    "select": "#284c35",
+    "select_text": "#ebfff2",
+}
+
+
 TEXT = {
     "en": {
         "title": "forza-painter FH6",
@@ -40,6 +59,7 @@ TEXT = {
         "tutorial_tab": "Tutorial",
         "images": "Images",
         "add_images": "Add images",
+        "remove_images": "Remove images",
         "quality": "Quality profile",
         "custom_settings": "Use custom settings",
         "custom_layers": "Output layers",
@@ -57,6 +77,7 @@ TEXT = {
         "generate_step_run_hint": "Click once and wait. Progress appears in Logs; generated JSON is added to the Import page automatically.",
         "scroll_hint": "Add image, choose a preset, then adjust custom settings if needed.",
         "start_generate": "Generate with current settings",
+        "stop_generate": "Stop generating",
         "open_output": "Open output folder",
         "preview": "Preview",
         "preview_hint": "Select an image or JSON to preview it here.",
@@ -143,6 +164,7 @@ Notes
         "tutorial_tab": "教程",
         "images": "图片",
         "add_images": "添加图片",
+        "remove_images": "移除图片",
         "quality": "品质配置",
         "custom_settings": "使用自定义参数",
         "custom_layers": "输出层数",
@@ -160,6 +182,7 @@ Notes
         "generate_step_run_hint": "点击一次后等待。进度会显示在日志里，生成的 JSON 会自动加入导入页面。",
         "scroll_hint": "添加图片、选择预设；需要时直接修改下方自定义参数。",
         "start_generate": "按当前配置生成",
+        "stop_generate": "停止生成",
         "open_output": "打开输出目录",
         "preview": "预览",
         "preview_hint": "选择图片或 JSON 后会在这里预览。",
@@ -400,6 +423,7 @@ class App:
         self.outputs = []
         self.processes = []
         self.photo = None
+        self.generator_process = None
         self.use_custom_settings = StringVar(value="0")
         self.custom_stop_at = StringVar()
         self.custom_max_resolution = StringVar()
@@ -419,7 +443,9 @@ class App:
         self.table_address = StringVar()
         self.inspect_table_value = StringVar()
         self.advanced_visible = False
+        self.generator_layer_samples = []
         self._build()
+        self._apply_theme()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.refresh_processes()
         if self.settings:
@@ -430,16 +456,39 @@ class App:
 
     def _configure_styles(self):
         style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        self.root.configure(bg=THEME["bg"])
+        self.root.option_add("*Font", "Georgia 10")
+        self.root.option_add("*selectBackground", THEME["select"])
+        self.root.option_add("*selectForeground", THEME["select_text"])
         style.configure(
             "Primary.TNotebook.Tab",
             padding=(18, 8),
-            font=("Segoe UI", 10, "bold"),
+            font=("Georgia", 10, "bold"),
+            background=THEME["panel"],
+            foreground=THEME["muted"],
+            bordercolor=THEME["line"],
+            lightcolor=THEME["panel"],
+            darkcolor=THEME["panel"],
         )
         style.map(
             "Primary.TNotebook.Tab",
-            background=[("selected", "#d8e8ff"), ("active", "#eef5ff")],
-            foreground=[("selected", "#003b73"), ("active", "#003b73")],
+            background=[("selected", THEME["panel2"]), ("active", THEME["button_hover"])],
+            foreground=[("selected", THEME["accent2"]), ("active", THEME["text"])],
         )
+        style.configure("Primary.TNotebook", background=THEME["bg"], borderwidth=0)
+        style.configure("TNotebook", background=THEME["bg"], borderwidth=0)
+        style.configure("TNotebook.Tab", padding=(16, 7), background=THEME["panel"], foreground=THEME["muted"])
+        style.map("TNotebook.Tab", background=[("selected", THEME["panel2"]), ("active", THEME["button_hover"])], foreground=[("selected", THEME["accent2"]), ("active", THEME["text"])])
+        style.configure("TLabelframe", background=THEME["panel"], foreground=THEME["text"], bordercolor=THEME["line"], relief="solid")
+        style.configure("TLabelframe.Label", background=THEME["bg"], foreground=THEME["accent"], font=("Georgia", 11, "bold"))
+        style.configure("TFrame", background=THEME["bg"])
+        style.configure("TScrollbar", background=THEME["panel2"], troughcolor=THEME["field"], bordercolor=THEME["line"], arrowcolor=THEME["muted"])
+        style.configure("TCombobox", fieldbackground=THEME["field"], background=THEME["button"], foreground=THEME["text"], bordercolor=THEME["line"], arrowcolor=THEME["accent"])
+        style.map("TCombobox", fieldbackground=[("readonly", THEME["field"])], foreground=[("readonly", THEME["text"])], selectbackground=[("readonly", THEME["select"])], selectforeground=[("readonly", THEME["select_text"])])
 
     def _register_process(self, proc):
         with self.process_lock:
@@ -495,14 +544,96 @@ class App:
         self.translated.append((widget, key, "text"))
         return widget
 
+    def _apply_theme(self):
+        self._theme_widget(self.root)
+        for label in (getattr(self, "preview_label", None), getattr(self, "import_preview_label", None)):
+            if label is not None:
+                label.configure(bg="#0a0d10", fg=THEME["muted"], highlightthickness=1, highlightbackground=THEME["line"])
+        if hasattr(self, "setting_description"):
+            self.setting_description.configure(bg=THEME["panel"], fg=THEME["muted"])
+        if hasattr(self, "log"):
+            self.log.configure(bg=THEME["field"], fg=THEME["text"], insertbackground=THEME["accent"], relief="flat", highlightthickness=1, highlightbackground=THEME["line"])
+        if hasattr(self, "tutorial_text"):
+            self.tutorial_text.configure(bg=THEME["field"], fg=THEME["text"], insertbackground=THEME["accent"], relief="flat", highlightthickness=1, highlightbackground=THEME["line"])
+
+    def _theme_widget(self, widget):
+        cls = widget.winfo_class()
+        try:
+            if cls in ("Frame", "Labelframe"):
+                widget.configure(bg=THEME["bg"])
+            elif cls == "Canvas":
+                widget.configure(bg=THEME["bg"], highlightthickness=0)
+            elif cls == "Label":
+                current_fg = str(widget.cget("fg"))
+                fg = THEME["text"] if current_fg in ("SystemButtonText", "black", "#000000") else current_fg
+                widget.configure(bg=THEME["bg"], fg=fg)
+            elif cls == "Button":
+                widget.configure(
+                    bg=THEME["button"],
+                    fg=THEME["text"],
+                    activebackground=THEME["button_hover"],
+                    activeforeground=THEME["text"],
+                    relief="flat",
+                    bd=0,
+                    highlightthickness=1,
+                    highlightbackground=THEME["line2"],
+                    highlightcolor=THEME["accent"],
+                    padx=12,
+                    pady=6,
+                )
+            elif cls == "Entry":
+                widget.configure(
+                    bg=THEME["field"],
+                    fg=THEME["text"],
+                    insertbackground=THEME["accent"],
+                    relief="flat",
+                    highlightthickness=1,
+                    highlightbackground=THEME["line"],
+                    highlightcolor=THEME["accent"],
+                )
+            elif cls == "Listbox":
+                widget.configure(
+                    bg=THEME["field"],
+                    fg=THEME["text"],
+                    selectbackground=THEME["select"],
+                    selectforeground=THEME["select_text"],
+                    relief="flat",
+                    highlightthickness=1,
+                    highlightbackground=THEME["line"],
+                    activestyle="none",
+                )
+            elif cls == "Text":
+                widget.configure(
+                    bg=THEME["field"],
+                    fg=THEME["text"],
+                    insertbackground=THEME["accent"],
+                    relief="flat",
+                    highlightthickness=1,
+                    highlightbackground=THEME["line"],
+                )
+            elif cls == "Checkbutton":
+                widget.configure(
+                    bg=THEME["panel"],
+                    fg=THEME["text"],
+                    activebackground=THEME["panel"],
+                    activeforeground=THEME["accent2"],
+                    selectcolor=THEME["field"],
+                    relief="flat",
+                    highlightthickness=0,
+                )
+        except Exception:
+            pass
+        for child in widget.winfo_children():
+            self._theme_widget(child)
+
     def _build(self):
         self._configure_styles()
         header = Frame(self.root)
         header.pack(fill=X, padx=14, pady=(12, 6))
         title_box = Frame(header)
         title_box.pack(side=LEFT, fill=X, expand=True)
-        self._label(title_box, "title", font=("Segoe UI", 18, "bold"), anchor="w").pack(fill=X)
-        self._label(title_box, "subtitle", anchor="w", fg="#555").pack(fill=X)
+        self._label(title_box, "title", font=("Georgia", 18, "bold"), anchor="w").pack(fill=X)
+        self._label(title_box, "subtitle", anchor="w", fg=THEME["muted"]).pack(fill=X)
         right = Frame(header)
         right.pack(side=RIGHT)
         self._label(right, "language").pack(anchor="e")
@@ -541,7 +672,7 @@ class App:
         right = Frame(self.generate_tab)
         right.pack(side=RIGHT, fill=BOTH, expand=True, pady=10)
 
-        self._label(left_outer, "scroll_hint", anchor="w", justify=LEFT, fg="#8a5300").pack(fill=X, pady=(0, 6))
+        self._label(left_outer, "scroll_hint", anchor="w", justify=LEFT, fg=THEME["accent"]).pack(fill=X, pady=(0, 6))
         scroll_area = Frame(left_outer)
         scroll_area.pack(fill=BOTH, expand=True, pady=(0, 8))
         left_canvas = Canvas(scroll_area, highlightthickness=0)
@@ -578,6 +709,7 @@ class App:
         row = Frame(step1)
         row.pack(fill=X, padx=10, pady=(6, 2))
         self._label(row, "images").pack(side=LEFT)
+        self._button(row, "remove_images", self.remove_images).pack(side=RIGHT)
         self._button(row, "add_images", self.add_images).pack(side=RIGHT)
         self.image_list = Listbox(step1, height=3)
         self.image_list.pack(fill=X, padx=10, pady=(2, 8))
@@ -604,7 +736,7 @@ class App:
         custom_section = ttk.LabelFrame(left, text=tr(self.lang, "custom_panel_title"))
         self.translated.append((custom_section, "custom_panel_title", "text"))
         custom_section.pack(fill=X, pady=(0, 6))
-        self._label(custom_section, "custom_panel_hint", anchor="w", justify=LEFT, wraplength=540, fg="#005a9e").pack(fill=X, padx=10, pady=(6, 2))
+        self._label(custom_section, "custom_panel_hint", anchor="w", justify=LEFT, wraplength=540, fg=THEME["accent"]).pack(fill=X, padx=10, pady=(6, 2))
         custom_toggle = Checkbutton(
             custom_section,
             text=tr(self.lang, "custom_settings"),
@@ -640,11 +772,12 @@ class App:
         self._label(step3, "generate_step_run_hint", anchor="w", justify=LEFT, wraplength=540).pack(fill=X, padx=10, pady=(8, 4))
         actions = Frame(step3)
         actions.pack(fill=X, padx=10, pady=(4, 12))
-        self._button(actions, "start_generate", self.start_generate, font=("Segoe UI", 12, "bold"), height=2).pack(side=LEFT, fill=X, expand=True)
+        self._button(actions, "start_generate", self.start_generate, font=("Georgia", 12, "bold"), height=2).pack(side=LEFT, fill=X, expand=True)
+        self._button(actions, "stop_generate", self.stop_generate, height=2).pack(side=LEFT, padx=(8, 0))
         self._button(actions, "open_output", self.open_output_folder, height=2).pack(side=LEFT, padx=8)
 
-        self._label(right, "preview", anchor="w", font=("Segoe UI", 12, "bold")).pack(fill=X)
-        self.preview_label = Label(right, text=tr(self.lang, "preview_hint"), bg="#202020", fg="#dddddd", width=60, height=24)
+        self._label(right, "preview", anchor="w", font=("Georgia", 12, "bold")).pack(fill=X)
+        self.preview_label = Label(right, text=tr(self.lang, "preview_hint"), bg=THEME["field"], fg=THEME["muted"], width=60, height=24)
         self.preview_label.pack(fill=BOTH, expand=True, pady=6)
 
     def _build_import_tab(self):
@@ -674,7 +807,7 @@ class App:
         template_row = Frame(step2)
         template_row.pack(fill=X, padx=10, pady=(0, 10))
         self._label(template_row, "layer_count").pack(side=LEFT)
-        Entry(template_row, textvariable=self.layer_count, width=18, font=("Segoe UI", 13)).pack(side=LEFT, padx=8)
+        Entry(template_row, textvariable=self.layer_count, width=18, font=("Georgia", 13)).pack(side=LEFT, padx=8)
 
         step3 = ttk.LabelFrame(left, text=tr(self.lang, "step_json"))
         self.translated.append((step3, "step_json", "text"))
@@ -693,11 +826,11 @@ class App:
         self.translated.append((step4, "step_import", "text"))
         step4.pack(fill=X, pady=(0, 10))
         self._label(step4, "step_import_hint", anchor="w", justify=LEFT, wraplength=500).pack(fill=X, padx=10, pady=(8, 4))
-        self._label(step4, "easy_import_hint", anchor="w", justify=LEFT, wraplength=500, fg="#555").pack(fill=X, padx=10, pady=4)
-        self._label(step4, "admin_note", anchor="w", justify=LEFT, wraplength=500, fg="#8a5300").pack(fill=X, padx=10, pady=4)
+        self._label(step4, "easy_import_hint", anchor="w", justify=LEFT, wraplength=500, fg=THEME["muted"]).pack(fill=X, padx=10, pady=4)
+        self._label(step4, "admin_note", anchor="w", justify=LEFT, wraplength=500, fg=THEME["accent"]).pack(fill=X, padx=10, pady=4)
         actions = Frame(step4)
         actions.pack(fill=X, padx=10, pady=12)
-        self._button(actions, "import_json", self.start_import, font=("Segoe UI", 13, "bold"), height=2).pack(side=LEFT, fill=X, expand=True)
+        self._button(actions, "import_json", self.start_import, font=("Georgia", 13, "bold"), height=2).pack(side=LEFT, fill=X, expand=True)
         self.advanced_button = self._button(actions, "show_advanced", self.toggle_advanced)
         self.advanced_button.pack(side=LEFT, padx=(8, 0))
 
@@ -707,8 +840,8 @@ class App:
         self._field(self.advanced_frame, "manual_table", self.table_address, row=1)
         self._button(self.advanced_frame, "auto_locate", self.start_auto_locate).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 4))
 
-        self._label(right, "import_preview", anchor="w", font=("Segoe UI", 12, "bold")).pack(fill=X, pady=(8, 0))
-        self.import_preview_label = Label(right, text=tr(self.lang, "preview_hint"), bg="#202020", fg="#dddddd", width=56, height=20)
+        self._label(right, "import_preview", anchor="w", font=("Georgia", 12, "bold")).pack(fill=X, pady=(8, 0))
+        self.import_preview_label = Label(right, text=tr(self.lang, "preview_hint"), bg=THEME["field"], fg=THEME["muted"], width=56, height=20)
         self.import_preview_label.pack(fill=BOTH, expand=True, pady=6)
 
     def _build_tools_tab(self):
@@ -736,7 +869,7 @@ class App:
         row.pack(fill=X, padx=14)
         self._label(row, "logs", anchor="w").pack(side=LEFT)
         self._label(row, "progress", anchor="e").pack(side=LEFT, padx=(18, 4))
-        Label(row, textvariable=self.progress_text, anchor="w", fg="#005a9e").pack(side=LEFT, fill=X, expand=True)
+        Label(row, textvariable=self.progress_text, anchor="w", fg=THEME["accent2"]).pack(side=LEFT, fill=X, expand=True)
         self.log = Text(self.root, height=9)
         self.log.pack(fill=BOTH, padx=14, pady=(0, 12))
 
@@ -836,6 +969,40 @@ class App:
         self.log.insert(END, f"[{timestamp}] {message}\n")
         self.log.see(END)
 
+    def _reset_generator_eta(self):
+        self.generator_layer_samples = []
+
+    def _format_duration(self, seconds):
+        seconds = max(0, int(round(seconds)))
+        hours, remainder = divmod(seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        if minutes:
+            return f"{minutes}m {seconds:02d}s"
+        return f"{seconds}s"
+
+    def _format_layer_progress(self, current, total):
+        now = time.time()
+        if self.generator_layer_samples and current <= self.generator_layer_samples[-1][0]:
+            self._reset_generator_eta()
+        self.generator_layer_samples.append((current, now))
+        if len(self.generator_layer_samples) > 200:
+            self.generator_layer_samples = self.generator_layer_samples[-200:]
+
+        eta_text = ""
+        if total > current and len(self.generator_layer_samples) >= 2:
+            first_layer, first_time = self.generator_layer_samples[0]
+            last_layer, last_time = self.generator_layer_samples[-1]
+            layers_done = last_layer - first_layer
+            elapsed = last_time - first_time
+            if layers_done > 0 and elapsed > 0:
+                seconds_per_layer = elapsed / layers_done
+                remaining_seconds = seconds_per_layer * (total - current)
+                finish_at = datetime.fromtimestamp(now + remaining_seconds).strftime("%H:%M:%S")
+                eta_text = f" | ETA {finish_at} ({self._format_duration(remaining_seconds)} left)"
+        return f"Generated layer {current}/{total}{eta_text}"
+
     def friendly_generator_line(self, line):
         text = (line or "").strip()
         if not text:
@@ -844,7 +1011,7 @@ class App:
         if progress:
             current, total, detail = progress.groups()
             if "Added rotated ellipse" in detail:
-                return f"Generated layer {current}/{total}"
+                return self._format_layer_progress(int(current), int(total))
             if "Saved geometry checkpoint" in detail:
                 return f"Saved JSON checkpoint {current}/{total}"
             if "Saved preview snapshot" in detail:
@@ -887,6 +1054,11 @@ class App:
         if files:
             self.show_preview(render_source_image(Path(files[0])))
 
+    def remove_images(self):
+        self.images.clear()
+        self._render_lists()
+        self.log_line("Cleared input images.")
+
     def add_json(self):
         files = filedialog.askopenfilenames(
             title="Choose geometry JSON",
@@ -920,19 +1092,19 @@ class App:
     def show_preview(self, data):
         if not data:
             message = tr(self.lang, "preview_unavailable")
-            self.preview_label.config(image="", text=message, bg="#202020")
+            self.preview_label.config(image="", text=message, bg=THEME["field"], fg=THEME["muted"])
             self.preview_label.image = None
             if hasattr(self, "import_preview_label"):
-                self.import_preview_label.config(image="", text=message, bg="#202020")
+                self.import_preview_label.config(image="", text=message, bg=THEME["field"], fg=THEME["muted"])
                 self.import_preview_label.image = None
             return
         self.photo = data
         image = PhotoImage(data=data)
-        self.preview_label.config(image=image, text="", bg="#202020")
+        self.preview_label.config(image=image, text="", bg=THEME["field"])
         self.preview_label.image = image
         if hasattr(self, "import_preview_label"):
             import_image = PhotoImage(data=data)
-            self.import_preview_label.config(image=import_image, text="", bg="#202020")
+            self.import_preview_label.config(image=import_image, text="", bg=THEME["field"])
             self.import_preview_label.image = import_image
 
     def show_preview_file(self, path):
@@ -942,11 +1114,11 @@ class App:
             self.show_preview(None)
             return
         self.photo = image
-        self.preview_label.config(image=image, text="", bg="#202020")
+        self.preview_label.config(image=image, text="", bg=THEME["field"])
         self.preview_label.image = image
         if hasattr(self, "import_preview_label"):
             import_image = PhotoImage(file=str(path))
-            self.import_preview_label.config(image=import_image, text="", bg="#202020")
+            self.import_preview_label.config(image=import_image, text="", bg=THEME["field"])
             self.import_preview_label.image = import_image
 
     def refresh_processes(self):
@@ -975,6 +1147,9 @@ class App:
         if not self.images:
             self.log_line("No images selected.")
             return
+        if self.generator_process and self.generator_process.poll() is None:
+            self.log_line("Generator is already running.")
+            return
         setting = self._effective_setting()
         if not setting:
             self.log_line("No quality profile selected.")
@@ -986,6 +1161,17 @@ class App:
         self.progress_text.set("")
         self.status.set(tr(self.lang, "running"))
         threading.Thread(target=self._generate_worker, args=(setting,), daemon=True).start()
+
+    def stop_generate(self):
+        self.shutdown_event.set()
+        proc = self.generator_process
+        if proc and proc.poll() is None:
+            self.log_line("Stopping generator...")
+            self._terminate_process(proc)
+            self.progress_text.set("Stopped")
+            self.status.set(tr(self.lang, "failed"))
+            return
+        self.log_line("No generator is running.")
 
     def _generate_worker(self, setting):
         try:
@@ -1003,6 +1189,7 @@ class App:
                         pass
                 self.queue.put(("log", f"Generating: {image_path}"))
                 self.queue.put(("preview", render_source_image(image_path)))
+                self._reset_generator_eta()
                 flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
                 cmd = build_generator_command(image_path, setting)
                 self.queue.put(("log", f"Running GPU generator with {setting['path'].name}"))
@@ -1018,6 +1205,7 @@ class App:
                     creationflags=flags,
                 )
                 self._register_process(proc)
+                self.generator_process = proc
 
                 last_preview = None
                 last_preview_mtime = None
@@ -1070,6 +1258,8 @@ class App:
                     _drain_generator_output()
                 finally:
                     self._unregister_process(proc)
+                    if self.generator_process is proc:
+                        self.generator_process = None
                 if proc.returncode != 0:
                     self.queue.put(("log", f"Generator exited with code {proc.returncode}."))
                     self.queue.put(("status", tr(self.lang, "failed")))
@@ -1098,6 +1288,8 @@ class App:
         except Exception as exc:
             self.queue.put(("log", f"Generator failed: {exc}"))
             self.queue.put(("status", tr(self.lang, "failed")))
+        finally:
+            self.generator_process = None
 
     def open_output_folder(self):
         folder = None

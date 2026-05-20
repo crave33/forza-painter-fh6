@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>forza-painter FH6</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brandBlock">
+        <div class="brandIcon">FP</div>
+        <div class="brandCopy">
+          <div class="brandText">forza-painter FH6</div>
+          <div class="brandEyebrow">geometry importer</div>
+        </div>
+      </div>
+      <div class="pathBar">
+        <select id="processSelect"></select>
+        <button id="refreshProcessesButton" class="ghostButton" type="button">Refresh</button>
+        <button id="openOutputButton" class="ghostButton" type="button">Open output folder</button>
+      </div>
+      <div class="toolbar">
+        <div class="statusBlock">
+          <div id="statusText">Ready</div>
+          <div id="progressText" class="statsText"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panelCard">
+          <div class="sectionHeader">
+            <div>
+              <div class="sectionTitle">Images</div>
+              <div class="sectionSubtext">Add PNG, JPG, JPEG, or BMP inputs.</div>
+            </div>
+          </div>
+          <div class="buttonRow">
+            <button id="addImagesButton" class="primaryButton" type="button">Add images</button>
+            <button id="removeImagesButton" class="ghostButton" type="button">Remove images</button>
+          </div>
+          <div id="imageList" class="fileList"></div>
+        </section>
+
+        <section class="panelCard">
+          <div class="sectionTitle">Quality profile</div>
+          <select id="profileSelect"></select>
+          <p id="profileDescription" class="helpText"></p>
+          <label class="switchRow">
+            <span>Use custom settings</span>
+            <input id="useCustomInput" type="checkbox">
+          </label>
+          <div class="fieldGrid">
+            <label><span>Output layers</span><input id="stopAtInput" type="number" min="1"></label>
+            <label><span>Max resolution</span><input id="maxResolutionInput" type="number" min="1"></label>
+            <label><span>Random samples</span><input id="randomSamplesInput" type="number" min="1"></label>
+            <label><span>Mutated samples</span><input id="mutatedSamplesInput" type="number" min="1"></label>
+            <label><span>Save checkpoints</span><input id="saveAtInput" type="number" min="1"></label>
+          </div>
+        </section>
+
+        <section class="panelCard">
+          <div class="sectionTitle">Generate</div>
+          <div class="buttonRow stacked">
+            <button id="generateButton" class="primaryButton wideButton" type="button">Generate with current settings</button>
+            <button id="stopGenerateButton" class="ghostButton wideButton" type="button">Stop generating</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="contentArea">
+        <div class="tabs">
+          <button id="generateTabButton" class="tabButton is-active" type="button">Generate</button>
+          <button id="importTabButton" class="tabButton" type="button">Import</button>
+        </div>
+
+        <section id="generatePanel" class="workspacePanel">
+          <div class="previewLogGrid">
+            <div class="previewColumn">
+              <div class="panelToolbar">
+                <div>
+                  <div class="sectionTitle">Preview</div>
+                  <div class="sectionSubtext">Select an image or JSON to preview it here.</div>
+                </div>
+              </div>
+              <div class="previewStage">
+                <img id="previewImage" alt="">
+                <div id="previewEmpty">Preview is unavailable until an image or generated JSON is selected.</div>
+              </div>
+            </div>
+            <div class="logColumn">
+              <div class="panelToolbar">
+                <div class="sectionTitle">Logs</div>
+                <button id="clearLogsButton" class="ghostButton compactButton" type="button">Clear</button>
+              </div>
+              <pre id="logOutput" class="logOutput"></pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="importPanel" class="workspacePanel" hidden>
+          <div class="twoColumn">
+            <section class="panelCard flatCard">
+              <div class="sectionHeader">
+                <div>
+                  <div class="sectionTitle">Geometry JSON files</div>
+                  <div class="sectionSubtext">Use generated JSON or add one manually.</div>
+                </div>
+              </div>
+              <div class="buttonRow">
+                <button id="addJsonButton" class="ghostButton" type="button">Add JSON</button>
+                <button id="useGeneratedButton" class="ghostButton" type="button">Use generated JSON</button>
+              </div>
+              <div id="jsonList" class="fileList tall"></div>
+            </section>
+
+            <section class="panelCard flatCard">
+              <div class="sectionTitle">Import into FH6</div>
+              <div class="fieldGrid single">
+                <label><span>Game profile</span>
+                  <select id="gameSelect">
+                    <option value="fh6">Forza Horizon 6</option>
+                    <option value="fh5">Forza Horizon 5</option>
+                    <option value="fh4">Forza Horizon 4</option>
+                  </select>
+                </label>
+                <label><span>PID</span><input id="pidInput" type="text" placeholder="Detected from process list"></label>
+                <label><span>Template layer count</span><input id="layerCountInput" type="number" min="1"></label>
+                <label><span>Layer count address</span><input id="countAddressInput" type="text" placeholder="Optional"></label>
+                <label><span>Layer table address</span><input id="tableAddressInput" type="text" placeholder="Optional"></label>
+              </div>
+              <button id="importButton" class="primaryButton wideButton" type="button">Import JSON</button>
+              <p class="helpText">For FH6, leave addresses empty. The app can reuse or auto-locate the current session.</p>
+            </section>
+          </div>
+        </section>
+
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
